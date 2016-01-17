@@ -1,6 +1,7 @@
 package quicktime
 
 import (
+	"bytes"
 	"errors"
 	"io"
 )
@@ -13,6 +14,12 @@ type IsoBmffInitSegment struct {
 type IsoBmffMediaSegment struct {
 	MOOF *Atom
 	MDAT *Atom
+}
+
+type IsoBmffMergedSegment struct {
+	*IsoBmffInitSegment
+	*IsoBmffMediaSegment
+	Buffer []byte
 }
 
 func ReadIsoBmffInitSegment(r io.Reader) (*IsoBmffInitSegment, error) {
@@ -57,4 +64,44 @@ func ReadIsoBmffMediaSegment(r io.Reader) (*IsoBmffMediaSegment, error) {
 	}
 
 	return &IsoBmffMediaSegment{moof, mdat}, nil
+}
+
+func ReadIsoBmffMergedSegment(r io.Reader, prev *IsoBmffMergedSegment) (*IsoBmffMergedSegment, error) {
+	var (
+		init  *IsoBmffInitSegment
+		media *IsoBmffMediaSegment
+		err   error
+	)
+
+	// Read init segment
+	if prev == nil {
+		init, err = ReadIsoBmffInitSegment(r)
+		if err != nil {
+			return nil, err
+		}
+	} else {
+		init = prev.IsoBmffInitSegment
+	}
+
+	// Read media segment
+	media, err = ReadIsoBmffMediaSegment(r)
+	if err != nil {
+		return nil, err
+	}
+
+	// Prepare for creating a buffer
+	ftyp := init.FTYP.Buffer
+	moov := init.MOOV.Buffer
+	moof := media.MOOF.Buffer
+	mdat := media.MDAT.Buffer
+	size := len(ftyp) + len(moov) + len(moof) + len(mdat)
+	buffer := bytes.NewBuffer(make([]byte, size))
+
+	// Write all segment one after the other
+	buffer.Write(ftyp)
+	buffer.Write(moov)
+	buffer.Write(moof)
+	buffer.Write(mdat)
+
+	return &IsoBmffMergedSegment{init, media, buffer.Bytes()}, nil
 }
