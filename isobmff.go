@@ -95,7 +95,7 @@ func ReadIsoBmffMergedSegment(r io.Reader, prev *IsoBmffMergedSegment) (*IsoBmff
 	moof := media.MOOF.Buffer
 	mdat := media.MDAT.Buffer
 	size := len(ftyp) + len(moov) + len(moof) + len(mdat)
-	buffer := bytes.NewBuffer(make([]byte, size))
+	buffer := bytes.NewBuffer(make([]byte, 0, size))
 
 	// Write all segment one after the other
 	buffer.Write(ftyp)
