@@ -1,12 +1,10 @@
-package main
+package quicktime
 
 import (
 	"bytes"
 	"encoding/binary"
 	"errors"
 	"io"
-	"log"
-	"os"
 )
 
 const AtomHeaderLength = 8
@@ -75,26 +73,26 @@ func ReadAtom(r io.Reader) (*Atom, error) {
 	return atom, nil
 }
 
-func main() {
-
-	var init *IsoBmffInitSegment
-	var err error
-
-	for {
-		if init == nil {
-			init, err = ReadIsoBmffInitSegment(os.Stdin)
-			if err != nil {
-				log.Fatal(err)
-			}
-		}
-
-		log.Println(init.FTYP.Header, init.MOOV.Header)
-
-		media, err := ReadIsoBmffMediaSegment(os.Stdin)
-		if err != nil {
-			log.Fatal(err)
-		}
-
-		log.Println(media.MOOF.Header, media.MDAT.Header)
-	}
-}
+// func main() {
+//
+// 	var init *IsoBmffInitSegment
+// 	var err error
+//
+// 	for {
+// 		if init == nil {
+// 			init, err = ReadIsoBmffInitSegment(os.Stdin)
+// 			if err != nil {
+// 				log.Fatal(err)
+// 			}
+// 		}
+//
+// 		log.Println(init.FTYP.Header, init.MOOV.Header)
+//
+// 		media, err := ReadIsoBmffMediaSegment(os.Stdin)
+// 		if err != nil {
+// 			log.Fatal(err)
+// 		}
+//
+// 		log.Println(media.MOOF.Header, media.MDAT.Header)
+// 	}
+// }
