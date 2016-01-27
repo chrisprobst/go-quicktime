@@ -6,6 +6,8 @@ import (
 	"io"
 )
 
+var ErrFinalSegment = errors.New("MFRA atom read")
+
 type IsoBmffInitSegment struct {
 	FTYP *Atom
 	MOOV *Atom
@@ -48,6 +50,10 @@ func ReadIsoBmffMediaSegment(r io.Reader) (*IsoBmffMediaSegment, error) {
 	moof, err := ReadAtom(r)
 	if err != nil {
 		return nil, err
+	}
+
+	if moof.Header.Type == "mfra" {
+		return nil, ErrFinalSegment
 	}
 
 	if moof.Header.Type != "moof" {
