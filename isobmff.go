@@ -1,7 +1,8 @@
-package quicktime
+package main
 
 import (
 	"bytes"
+	"encoding/binary"
 	"errors"
 	"io"
 )
@@ -14,8 +15,10 @@ type IsoBmffInitSegment struct {
 }
 
 type IsoBmffMediaSegment struct {
-	MOOF *Atom
-	MDAT *Atom
+	MOOF                     *Atom
+	MDAT                     *Atom
+	BaseVideoMediaDecodeTime uint64
+	BaseAudioMediaDecodeTime uint64
 }
 
 type IsoBmffMergedSegment struct {
@@ -60,6 +63,120 @@ func ReadIsoBmffMediaSegment(r io.Reader) (*IsoBmffMediaSegment, error) {
 		return nil, errors.New("MOOF atom expected but got: " + moof.Header.Type)
 	}
 
+	////////////////////////////////////////////////////////////////////////
+	//////////////////////////// Base media decode time ////////////////////
+	////////////////////////////////////////////////////////////////////////
+
+	// MFHD [skip]
+	mfhd, err := ParseAtomHeader(moof.Buffer[AtomHeaderLength:])
+	if err != nil {
+		return nil, err
+	}
+
+	if mfhd.Type != "mfhd" {
+		return nil, errors.New("MFHD atom expected but got: " + mfhd.Type)
+	}
+
+	// TRAF
+	videoTraf, err := ParseAtomHeader(moof.Buffer[AtomHeaderLength+mfhd.Size:])
+	if err != nil {
+		return nil, err
+	}
+
+	if videoTraf.Type != "traf" {
+		return nil, errors.New("TRAF atom expected but got: " + videoTraf.Type)
+	}
+
+	// TRAF->TFHD [skip]
+	videoTfhd, err := ParseAtomHeader(moof.Buffer[AtomHeaderLength+mfhd.Size+AtomHeaderLength:])
+	if err != nil {
+		return nil, err
+	}
+
+	if videoTfhd.Type != "tfhd" {
+		return nil, errors.New("TFHD atom expected but got: " + videoTfhd.Type)
+	}
+
+	// TRAF->TFDT [Base media decode time]
+	videoTfdt, err := ParseAtomHeader(moof.Buffer[AtomHeaderLength+mfhd.Size+AtomHeaderLength+videoTfhd.Size:])
+	if err != nil {
+		return nil, err
+	}
+
+	if videoTfdt.Type != "tfdt" {
+		return nil, errors.New("TFDT atom expected but got: " + videoTfdt.Type)
+	}
+
+	var baseVideoMediaDecodeTime uint64
+	binary.Read(
+		bytes.NewReader(moof.Buffer[AtomHeaderLength+mfhd.Size+AtomHeaderLength+videoTfhd.Size+AtomHeaderLength+4:]),
+		binary.BigEndian,
+		&baseVideoMediaDecodeTime)
+
+	////////////////////////////////////////////////////////////////////////
+	////////////////////////////////////////////////////////////////////////
+
+	// MFHD [skip]
+	mfhd, err = ParseAtomHeader(moof.Buffer[AtomHeaderLength:])
+	if err != nil {
+		return nil, err
+	}
+
+	if mfhd.Type != "mfhd" {
+		return nil, errors.New("MFHD atom expected but got: " + mfhd.Type)
+	}
+
+	// TRAF [skip]
+	videoTraf, err = ParseAtomHeader(moof.Buffer[AtomHeaderLength+mfhd.Size:])
+	if err != nil {
+		return nil, err
+	}
+
+	if videoTraf.Type != "traf" {
+		return nil, errors.New("TRAF atom expected but got: " + videoTraf.Type)
+	}
+
+	////////////////////////////////////////////////////////////////////////
+
+	// TRAF
+	audioTraf, err := ParseAtomHeader(moof.Buffer[AtomHeaderLength+mfhd.Size+videoTraf.Size:])
+	if err != nil {
+		return nil, err
+	}
+
+	if audioTraf.Type != "traf" {
+		return nil, errors.New("TRAF atom expected but got: " + audioTraf.Type)
+	}
+
+	// TRAF->TFHD [skip]
+	audioTfhd, err := ParseAtomHeader(moof.Buffer[AtomHeaderLength+mfhd.Size+videoTraf.Size+AtomHeaderLength:])
+	if err != nil {
+		return nil, err
+	}
+
+	if audioTfhd.Type != "tfhd" {
+		return nil, errors.New("TFHD atom expected but got: " + audioTfhd.Type)
+	}
+
+	// TRAF->TFDT [Base media decode time]
+	audioTfdt, err := ParseAtomHeader(moof.Buffer[AtomHeaderLength+mfhd.Size+videoTraf.Size+AtomHeaderLength+audioTfhd.Size:])
+	if err != nil {
+		return nil, err
+	}
+
+	if audioTfdt.Type != "tfdt" {
+		return nil, errors.New("TFDT atom expected but got: " + audioTfdt.Type)
+	}
+
+	var baseAudioMediaDecodeTime uint64
+	binary.Read(
+		bytes.NewReader(moof.Buffer[AtomHeaderLength+mfhd.Size+videoTraf.Size+AtomHeaderLength+audioTfhd.Size+AtomHeaderLength+4:]),
+		binary.BigEndian,
+		&baseAudioMediaDecodeTime)
+
+	////////////////////////////////////////////////////////////////////////
+	////////////////////////////////////////////////////////////////////////
+
 	mdat, err := ReadAtom(r)
 	if err != nil {
 		return nil, err
@@ -69,7 +186,7 @@ func ReadIsoBmffMediaSegment(r io.Reader) (*IsoBmffMediaSegment, error) {
 		return nil, errors.New("MDAT atom expected but got: " + mdat.Header.Type)
 	}
 
-	return &IsoBmffMediaSegment{moof, mdat}, nil
+	return &IsoBmffMediaSegment{moof, mdat, baseVideoMediaDecodeTime, baseAudioMediaDecodeTime}, nil
 }
 
 func ReadIsoBmffMergedSegment(r io.Reader, prev *IsoBmffMergedSegment) (*IsoBmffMergedSegment, error) {

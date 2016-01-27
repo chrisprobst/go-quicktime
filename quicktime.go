@@ -1,4 +1,4 @@
-package quicktime
+package main
 
 import (
 	"bytes"
@@ -23,7 +23,7 @@ type Atom struct {
 }
 
 func ParseAtomHeader(buffer []byte) (*AtomHeader, error) {
-	if len(buffer) != AtomHeaderLength {
+	if len(buffer) < AtomHeaderLength {
 		return nil, errors.New("Invalid buffer size")
 	}
 
@@ -43,7 +43,7 @@ func ParseAtomHeader(buffer []byte) (*AtomHeader, error) {
 	}
 
 	// Read atom type
-	atomType := string(buffer[4:])
+	atomType := string(buffer[4:8])
 
 	return &AtomHeader{int(atomSize), int(atomSize) - AtomHeaderLength, atomType}, nil
 }
