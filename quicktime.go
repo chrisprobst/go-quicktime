@@ -27,8 +27,7 @@ func ParseAtomHeader(buffer []byte) (*AtomHeader, error) {
 
 	// Read atom size
 	var atomSize uint32
-	err := binary.Read(bytes.NewReader(buffer), binary.BigEndian, &atomSize)
-	if err != nil {
+	if err := binary.Read(bytes.NewReader(buffer), binary.BigEndian, &atomSize); err != nil {
 		return nil, err
 	}
 
@@ -50,8 +49,7 @@ func ReadAtom(r io.Reader) (*Atom, error) {
 	var atomBuffer bytes.Buffer
 
 	// Read header
-	_, err := io.CopyN(&atomBuffer, r, AtomHeaderLength)
-	if err != nil {
+	if _, err := io.CopyN(&atomBuffer, r, AtomHeaderLength); err != nil {
 		return nil, err
 	}
 
@@ -62,8 +60,7 @@ func ReadAtom(r io.Reader) (*Atom, error) {
 	}
 
 	// Read atom data
-	_, err = io.CopyN(&atomBuffer, r, int64(atomHeader.DataSize))
-	if err != nil {
+	if _, err = io.CopyN(&atomBuffer, r, int64(atomHeader.DataSize)); err != nil {
 		return nil, err
 	}
 
